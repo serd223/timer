@@ -20,6 +20,7 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native("Timer", options, Box::new(|cc| Box::new(App::from_cc(cc))))
 }
 
+#[derive(Clone)]
 struct DateStr {
     hour: String,
     minute: String,
@@ -65,6 +66,7 @@ impl DateStr {
 
 struct App {
     input: DateStr,
+    marked: DateStr,
     target: Instant,
     paused: bool,
     remaining: u64,
@@ -78,10 +80,12 @@ impl App {
             Some(storage) => {
                 let remaining = storage.get_string("remaining");
                 let duration = storage.get_string("duration");
-                match (duration, remaining) {
-                    (Some(duration), Some(remaining)) => {
+                let marked = storage.get_string("marked");
+                match (duration, remaining, marked) {
+                    (Some(duration), Some(remaining), Some(marked)) => {
                         let remaining = remaining.parse::<u64>().unwrap();
                         let duration = duration.parse::<u64>().unwrap();
+                        let marked = marked.parse::<u64>().unwrap();
                         App {
                             target: Instant::now()
                                 .checked_add(Duration::from_secs(duration))
@@ -89,6 +93,7 @@ impl App {
                             remaining,
                             timer_duration: Duration::from_secs(duration),
                             input: DateStr::from_seconds(remaining),
+                            marked: DateStr::from_seconds(marked),
                             ..Default::default()
                         }
                     }
@@ -103,6 +108,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             input: DateStr::default(),
+            marked: DateStr::default(),
             target: Instant::now(),
             paused: true,
             remaining: 0,
@@ -115,6 +121,7 @@ impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string("remaining", self.remaining.to_string());
         storage.set_string("duration", self.timer_duration.as_secs().to_string());
+        storage.set_string("marked", self.marked.parse_secs().unwrap().to_string());
         storage.flush();
     }
 
@@ -134,7 +141,9 @@ impl eframe::App for App {
                 for (_, font_id) in ui.style_mut().text_styles.iter_mut() {
                     font_id.size *= (width * height).sqrt()
                         / ((DEFAULT_WIDTH * DEFAULT_HEIGHT) as f32).sqrt()
-                        * 2.5;
+                        * 1.85;
+
+                    // * 2.5;
                     // font_id.size *= 1.85;
                 }
 
@@ -202,6 +211,19 @@ impl eframe::App for App {
                         self.input.minute = format!("{m:0>2}");
                         self.input.second = format!("{s:0>2}");
                     }
+                }
+
+                if ui
+                    .button(
+                        format!(
+                            "Mark: {}:{}:{}",
+                            self.marked.hour, self.marked.minute, self.marked.second
+                        )
+                        .as_str(),
+                    )
+                    .clicked()
+                {
+                    self.marked = self.input.clone();
                 }
             });
         });
